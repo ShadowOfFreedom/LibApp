@@ -1,12 +1,8 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+﻿using LibApp.Models;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using LibApp.Models;
 
-namespace LibApp.Data
-{
+namespace LibApp.Data {
     public class ApplicationDbContext : IdentityDbContext
     {
         public DbSet<Customer> Customers { get; set; }
@@ -14,10 +10,9 @@ namespace LibApp.Data
         public DbSet<Book> Books { get; set; }
         public DbSet<Genre> Genre { get; set; }
         public DbSet<Rental> Rentals { get; set; }
+        public DbSet<Role> Roles { get; set; }
 
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-            : base(options)
-        {
-        }
+            : base(options) { }
     }
 }

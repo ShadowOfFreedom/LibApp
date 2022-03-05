@@ -1,107 +1,92 @@
-using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using LibApp.Models;
+using LibApp.Repositories.Interfaces;
 using LibApp.ViewModels;
-using LibApp.Data;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Threading.Tasks;
+using System.Web.Http;
 
-namespace LibApp.Controllers
-{
-    public class CustomersController : Controller
-    {
-        private readonly ApplicationDbContext _context;
+namespace LibApp.Controllers {
+    public class CustomersController : Controller {
+        private readonly IRepositoryAsync<Customer> _customersRepo;
+        private readonly IRepositoryAsync<MembershipType> _membershipTypesRepo;
 
-        public CustomersController(ApplicationDbContext context)
-        {
-            _context = context;
+        public CustomersController(IRepositoryAsync<Customer> customersRepo,
+            IRepositoryAsync<MembershipType> membershipTypesRepo) {
+            _customersRepo = customersRepo;
+            _membershipTypesRepo = membershipTypesRepo;
         }
 
-        public ViewResult Index()
-        {         
-            return View();
-        }
+        [Authorize(Roles = "StoreManager")]
+        [Authorize(Roles = "Owner")]
+        public async Task<ViewResult> Index() => View(await _customersRepo.GetAll());
 
-        public IActionResult Details(int id)
-        {
-            var customer = _context.Customers
-                .Include(c => c.MembershipType)
-                .SingleOrDefault(c => c.Id == id);
+
+        [Authorize(Roles = "StoreManager")]
+        [Authorize(Roles = "Owner")]
+        public async Task<IActionResult> Details(int id) {
+            var customer = await _customersRepo.GetById(id);
 
             if (customer == null)
-            {
                 return Content("User not found");
-            }
 
             return View(customer);
         }
 
-        public IActionResult New()
-        {
-            var membershipTypes = _context.MembershipTypes.ToList();
-
-            var viewModel = new CustomerFormViewModel()
-            {
-                MembershipTypes = membershipTypes
+        
+        [Authorize(Roles = "Owner")]
+        public async Task<IActionResult> New() {
+            var viewModel = new CustomerFormViewModel() {
+                MembershipTypes = await _membershipTypesRepo.GetAll()
             };
 
             return View("CustomerForm", viewModel);
         }
 
-        public IActionResult Edit(int id)
-        {
-            var customer = _context.Customers.SingleOrDefault(c => c.Id == id);
+        [Authorize(Roles = "Owner")]
+        public async Task<IActionResult> Edit(int id) {
+            var customer = await _customersRepo.GetById(id);
             if (customer == null)
-            {
                 return NotFound();
-            }
 
-            var viewModel = new CustomerFormViewModel(customer)
-            {
-                MembershipTypes = _context.MembershipTypes.ToList()
+            var viewModel = new CustomerFormViewModel(customer) {
+                MembershipTypes = await _membershipTypesRepo.GetAll()
             };
 
             return View("CustomerForm", viewModel);
         }
 
-        [HttpPost]
+        [Microsoft.AspNetCore.Mvc.HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Save(Customer customer)
-        {
-            if (!ModelState.IsValid)
-            {
-                var viewModel = new CustomerFormViewModel(customer)
-                {
-                    MembershipTypes = _context.MembershipTypes.ToList()
+        [Authorize(Roles = "Owner")]
+        public async Task<IActionResult> Save(Customer customer) {
+            if (!ModelState.IsValid) {
+                var viewModel = new CustomerFormViewModel(customer) {
+                    MembershipTypes = await _membershipTypesRepo.GetAll()
                 };
 
                 return View("CustomerForm", viewModel);
             }
-            if (customer.Id == 0)
-            {
-                _context.Customers.Add(customer);
-            }
-            else
-            {
-                var customerInDb = _context.Customers.Single(c => c.Id == customer.Id);
-                customerInDb.Name = customer.Name;
-                customerInDb.Birthdate = customer.Birthdate;
-                customerInDb.MembershipTypeId = customer.MembershipTypeId;
-                customerInDb.HasNewsletterSubscribed = customer.HasNewsletterSubscribed;
-            }
 
-            try
-            {
-                _context.SaveChanges();
+            try {
+                if (customer.Id == 0)
+                    await _customersRepo.Add(customer);
+                else {
+                    var customerInDb = await _customersRepo.GetById(customer.Id);
+                    customerInDb.Name = customer.Name;
+                    customerInDb.Birthdate = customer.Birthdate;
+                    customerInDb.MembershipTypeId = customer.MembershipTypeId;
+                    customerInDb.HasNewsletterSubscribed = customer.HasNewsletterSubscribed;
+                }
             }
-            catch (DbUpdateException e)
-            {
+            catch (DbUpdateException e) {
                 Console.WriteLine(e);
             }
 
             return RedirectToAction("Index", "Customers");
         }
+
+        public ViewResult Login() => View("Login");
     }
 }

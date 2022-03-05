@@ -1,0 +1,46 @@
+﻿<h2>Login</h2>
+
+<form id="login-form">
+    <div class="form-group">
+        <label>Email</label>
+        <input id="email" type="text" value="" class="form-control" />
+    </div>
+    <div class="form-group">
+        <label>Password</label>
+        <input id="password" type="text" value="" class="form-control" />
+    </div>
+    
+    <button id="submit" class="btn btn-outline-primary">Login</button>
+</form>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            $('#submit').click(
+                function(event) {
+                    event.preventDefault();
+                    
+                    var data = {};
+                    data['email'] = $('#email').val();
+                    data['password'] = $('#password').val();
+
+                    var jsonData = JSON.stringify(data);
+
+                    $.ajax({
+                        url: '/api/Accounts/login',
+                        type: "POST",
+                        data: jsonData,
+                        contentType: "application/json; charset=utf-8",
+                        success: function (res) {
+                            document.cookie = 'Bearer=' + res;
+                            window.location.href = '/Home/index';
+                        },
+                        error: function(res) {
+                            console.log("failed");
+                        }
+                    });
+                });
+
+        });
+    </script>
+}

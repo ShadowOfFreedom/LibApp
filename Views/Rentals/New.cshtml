@@ -15,7 +15,7 @@
         <input id="book" type="text" value="" class="form-control"/>
     </div>
 
-    <ul id="books"></ul>
+    @* <ul id="books"></ul> *@
 
     <button class="btn btn-primary">Submit</button>
 </form>
@@ -45,9 +45,33 @@
                 display: 'name',
                 source: customers
                 }).on("typeahead:select", function (e, customer) {
-                    consol.log("Customer ID: " + customer.id);
+                    console.log("Customer ID: " + customer.id);
                     formData.customerId = customer.id;
-                });
+            });
+
+            var books = new Bloodhound({
+                datumTokenizer: Bloodhound.tokenizers.obj.whitespace('name'),
+                queryTokenizer: Bloodhound.tokenizers.whitespace,
+                remote: {
+                    url: '/api/books?=%QUERY',
+                    wildcard: '%QUERY'
+                }
+            });
+
+            $('#book').typeahead(
+                {
+                    minLength: 3,
+                    highlight: true
+                },
+                {
+                    name: 'books',
+                    display: 'name',
+                    source: books,
+                    limit: 10
+                }).on("typeahead:select", function (e, book) {
+                console.log("Book ID: " + book.id);
+                formData.bookId = book.id;
+            });
         });
     </script>
 }

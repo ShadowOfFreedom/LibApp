@@ -1,106 +1,87 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using LibApp.Models;
+﻿using LibApp.Models;
+using LibApp.Repositories.Interfaces;
 using LibApp.ViewModels;
-using LibApp.Data;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 
-namespace LibApp.Controllers
-{
-    public class BooksController : Controller
-    {
-        private readonly ApplicationDbContext _context;
+namespace LibApp.Controllers {
+    [Authorize]
+    public class BooksController : Controller {
+        private readonly IRepositoryAsync<Book> _booksRepo;
+        private readonly IRepositoryAsync<Genre> _genresRepo;
 
-        public BooksController(ApplicationDbContext context)
-        {
-            _context = context;
+        public BooksController( IRepositoryAsync<Book> booksRepo, IRepositoryAsync<Genre> genresRepo) {
+            _booksRepo = booksRepo;
+            _genresRepo = genresRepo;
         }
 
-        public IActionResult Index()
-        {
-            var books = _context.Books
-                .Include(b => b.Genre)
-                .ToList();
+        public async Task<IActionResult> Index() =>
+            View( await _booksRepo.GetAll());
 
-            return View(books);
-        }
-
-        public IActionResult Details(int id)
-        {
-            var book = _context.Books
-                .Include(b => b.Genre)
-                .SingleOrDefault(b => b.Id == id);
+        public async Task<IActionResult> Details(int id) {
+            var book = await _booksRepo.GetById(id);
 
             if (book == null)
-            {
                 return Content("Book not found");
-            }
 
             return View(book);
         }
 
-        public IActionResult Edit(int id)
-        {
-            var book = _context.Books.SingleOrDefault(b => b.Id == id);
-            if (book == null)
-            {
-                return NotFound();
-            }
 
-            var viewModel = new BookFormViewModel
-            {
-                Book = book,
-                Genres = _context.Genre.ToList()
+        [Authorize(Roles = "StoreManager")]
+        [Authorize(Roles = "Owner")]
+        public async Task<IActionResult> New() {
+            var viewModel = new BookFormViewModel {
+                Genres = await _genresRepo.GetAll()
             };
 
             return View("BookForm", viewModel);
         }
 
-        public IActionResult New()
-        {
-            var viewModel = new BookFormViewModel
-            {
-                Genres = _context.Genre.ToList()
+
+        [Authorize(Roles = "StoreManager")]
+        [Authorize(Roles = "Owner")]
+        public async Task<IActionResult> Edit(int id) {
+            var book = await _booksRepo.GetById(id);
+            if (book == null)
+                return NotFound();
+
+            var viewModel = new BookFormViewModel(book) {
+                Genres = await _genresRepo.GetAll()
             };
 
             return View("BookForm", viewModel);
         }
 
         [HttpPost]
-        public IActionResult Save(Book book)
-        {
-            if (book.Id == 0)
-            {
-                book.DateAdded = DateTime.Now;
-                _context.Books.Add(book);
-            }
-            else
-            {
-                var bookInDb = _context.Books.Single(c => c.Id == book.Id);
-                bookInDb.Name = book.Name;
-                bookInDb.AuthorName = book.AuthorName;
-                bookInDb.GenreId= book.GenreId;
-                bookInDb.NumberInStock = book.NumberInStock;
-                bookInDb.ReleaseDate = book.ReleaseDate;
-                bookInDb.DateAdded = book.DateAdded;
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "StoreManager")]
+        [Authorize(Roles = "Owner")]
+        public async Task<IActionResult> Save(Book book) {
+            if (!ModelState.IsValid) {
+                var viewModel = new BookFormViewModel(book) {
+                    Genres = await _genresRepo.GetAll()
+                };
+
+                return View("BookForm", viewModel);
             }
 
-            try
-            {
-                _context.SaveChanges();
+            try {
+                if (book.Id == 0) {
+                    book.DateAdded = DateTime.Now;
+                    await _booksRepo.Add(book);
+                }
+                else
+                    await _booksRepo.Update(book);
             }
-            catch (DbUpdateException e)
-            {
+            catch (DbUpdateException e) {
                 Console.WriteLine(e);
             }
 
             return RedirectToAction("Index", "Books");
         }
-
-
-
     }
 }

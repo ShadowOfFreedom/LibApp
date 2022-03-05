@@ -1,57 +1,51 @@
-﻿using LibApp.Data;
-using LibApp.Dtos;
+﻿using LibApp.Dtos;
 using LibApp.Models;
-using Microsoft.AspNetCore.Http;
+using LibApp.Repositories.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
-namespace LibApp.Controllers.Api
-{
+namespace LibApp.Controllers.Api {
     [Route("api/[controller]")]
     [ApiController]
-    public class NewRentalsController : ControllerBase
-    {
-        public NewRentalsController(ApplicationDbContext context)
-        {
-            _context = context;
+    public class NewRentalsController : ControllerBase {
+        private readonly IRepositoryAsync<Rental> _rentalsRepo;
+        private readonly IRepositoryAsync<Customer> _customersRepo;
+        private readonly IRepositoryAsync<Book> _booksRepo;
+
+        public NewRentalsController(IRepositoryAsync<Rental> rentalsRepo, IRepositoryAsync<Customer> customersRepo, IRepositoryAsync<Book> booksRepo) {
+            _rentalsRepo = rentalsRepo;
+            _customersRepo = customersRepo;
+            _booksRepo = booksRepo;
         }
 
         [HttpPost]
-        public IActionResult CreateNewRentals(NewRentalDto newRental)
-        {
-            var customer = _context.Customers
-                .Include(c => c.MembershipType)
-                .SingleOrDefault(c => c.Id == newRental.CustomerId);
+        public async Task<IActionResult> CreateNewRentals(NewRentalDto newRental) {
+            var customer = await _customersRepo.GetById(newRental.CustomerId);
+            
+            var books = new List<Book>();
+            foreach (var bookId in newRental.BookIds) {
+                var book = await _booksRepo.GetById(bookId);
+                if (book != null) books.Add(book);
+            }
 
-            var books = _context.Books
-                .Include(b => b.Genre)
-                .Where(b => newRental.BookIds.Contains(b.Id)).ToList();
-
-            foreach (var book in books)
-            {
+            foreach (var book in books) {
                 if (book.NumberAvailable == 0)
                     return BadRequest("Book is no available");
 
                 book.NumberAvailable--;
 
-                var rental = new Rental()
-                {
+                var rental = new Rental() {
                     Customer = customer,
                     Book = book,
                     DateRented = DateTime.Now
                 };
-
-                _context.Rentals.Add(rental);
+                
+                await _rentalsRepo.Add(rental);
             }
-
-            _context.SaveChanges();
 
             return Ok();
         }
-        private readonly ApplicationDbContext _context;
     }
 }
